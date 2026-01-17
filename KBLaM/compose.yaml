@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  kblam:
+    image: node2.bdcl:5000/kblam:latest
+    container_name: kblam
+    entrypoint: pdm
+    working_dir: /app
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-2}
+      - SAVE_PERIOD=${SAVE_PERIOD:-600}
+      - WANDB_MODE=${WANDB_MODE:-offline}
+      - DATASET_NAME=${DATASET_NAME:-enron}
+      # DATASET_NAME will default to 'enron' if not set
+    volumes:
+      # Output directory
+      - ${OUTPUT_DIR:-./output}:/output
+      # Datasets directory
+      - ${DATASETS_DIR:-./datasets}:/datasets
+      # Model cache directories (adjust paths as needed)
+      - ${MODEL_CACHE_DIR:-./models}:/root/hugging_cache
+      # Optional: Mount specific models if needed
+      # - /path/to/all-MiniLM-L6-v2:/root/hugging_cache/all-MiniLM-L6-v2
+      # - /path/to/Phi-3-mini-4k-instruct:/root/hugging_cache/Phi-3-mini-4k-instruct
+    # Command can be overridden via docker compose run or by modifying this section
+    # Note: Environment variable substitution in command uses ${VAR} syntax
+    command:
+      - run
+      - ./experiments/train.py
+      - --dataset_dir=/datasets
+      - --train_dataset=${DATASET_NAME}
+      - --N=120000
+      - --B=1
+      - --total_steps=601
+      - --encoder_spec=all-MiniLM-L6-v2
+      - --key_embd_src=key
+      - --use_data_aug
+      - --use_cached_embd
+      - --llm_type=phi3
+      - --hf_model_spec=/root/hugging_cache/Phi-3-mini-4k-instruct
+      - --model_save_dir=/output
+      - --log_to_file
+      - --verbose
+    stdin_open: true
+    tty: true
+
